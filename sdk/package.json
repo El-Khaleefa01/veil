@@ -122,6 +122,7 @@
     "size": "npm run build && size-limit",
     "test:surface": "jest api-surface.test.ts",
     "verify:exports": "npm run build && node scripts/verify-exports.js",
+    "check:readme": "node scripts/check-readme-snippets.js",
     "stryker": "stryker run",
     "storybook": "storybook dev -p 6006 -c react/.storybook",
     "build-storybook": "storybook build -c react/.storybook -o react/storybook-static",

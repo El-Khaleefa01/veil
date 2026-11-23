@@ -25,20 +25,35 @@ Optional peer dependencies based on your framework:
 Wrap your app or component tree with the `useInvisibleWallet` hook:
 
 ```tsx
+// @check-readme-ignore - example showing hook usage pattern
 import React, { useState } from 'react';
-import { useInvisibleWallet } from 'invisible-wallet-sdk';
+import { useInvisibleWallet, type TransactionSigner } from 'invisible-wallet-sdk';
 
 const config = {
-  factoryContractId: 'CA...',
+  factoryAddress: 'CA...',
   networkPassphrase: 'Test SDF Network ; September 2015',
   rpcUrl: 'https://soroban-testnet.stellar.org',
 };
 
+// Signing signer - secret lives on backend, not in browser
+const feePayer: TransactionSigner = {
+  publicKey: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  signTransaction: async (xdr, { networkPassphrase }) => {
+    const res = await fetch('/api/sign', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ xdr, networkPassphrase }),
+    });
+    if (!res.ok) throw new Error('Signing failed');
+    return (await res.json()).signedXdr;
+  },
+};
+
 export function WalletConnect() {
   const [username, setUsername] = useState('');
-  const { address, isConnected, isDeploying, connect, deploy, error } = useInvisibleWallet(config);
+  const { address, isDeployed, isPending, register, login, deploy, error } = useInvisibleWallet(config);
 
-  if (isConnected) {
+  if (isDeployed && address) {
     return <div>Connected wallet: {address}</div>;
   }
 
@@ -50,11 +65,16 @@ export function WalletConnect() {
         value={username}
         onChange={(e) => setUsername(e.target.value)}
       />
-      <button onClick={() => connect(username)}>Sign In with Passkey</button>
-      <button onClick={() => deploy(username)} disabled={isDeploying}>
-        {isDeploying ? 'Deploying...' : 'Register & Deploy'}
+      <button onClick={() => register(username)} disabled={isPending}>
+        {isPending ? 'Creating...' : 'Create Passkey'}
       </button>
-      {error && <p style={{ color: 'red' }}>{error.message}</p>}
+      <button onClick={() => login()} disabled={isPending}>
+        Sign In with Passkey
+      </button>
+      <button onClick={() => deploy(feePayer)} disabled={isPending || !address}>
+        {isPending ? 'Deploying...' : 'Deploy Wallet'}
+      </button>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
     </div>
   );
 }
@@ -67,31 +87,49 @@ export function WalletConnect() {
 Import the composable from the `/vue` subpath:
 
 ```vue
+<!-- @check-readme-ignore - example showing Vue composable usage pattern -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useInvisibleWallet } from 'invisible-wallet-sdk/vue';
+import { useInvisibleWallet, type TransactionSigner } from 'invisible-wallet-sdk/vue';
 
 const config = {
-  factoryContractId: 'CA...',
+  factoryAddress: 'CA...',
   networkPassphrase: 'Test SDF Network ; September 2015',
   rpcUrl: 'https://soroban-testnet.stellar.org',
 };
 
+// Signing signer - secret lives on backend, not in browser
+const feePayer: TransactionSigner = {
+  publicKey: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  signTransaction: async (xdr, { networkPassphrase }) => {
+    const res = await fetch('/api/sign', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ xdr, networkPassphrase }),
+    });
+    if (!res.ok) throw new Error('Signing failed');
+    return (await res.json()).signedXdr;
+  },
+};
+
 const username = ref('');
-const { address, isConnected, isDeploying, connect, deploy, error } = useInvisibleWallet(config);
+const { address, isDeployed, isPending, register, login, deploy, error } = useInvisibleWallet(config);
 </script>
 
 <template>
-  <div v-if="isConnected">
+  <div v-if="isDeployed && address">
     <p>Connected: {{ address }}</p>
   </div>
   <div v-else>
     <input v-model="username" placeholder="Username" />
-    <button @click="connect(username)">Sign In</button>
-    <button :disabled="isDeploying" @click="deploy(username)">
-      {{ isDeploying ? 'Deploying...' : 'Register' }}
+    <button :disabled="isPending" @click="register(username)">
+      {{ isPending ? 'Creating...' : 'Create Passkey' }}
     </button>
-    <p v-if="error" style="color: red">{{ error.message }}</p>
+    <button :disabled="isPending" @click="login()">Sign In</button>
+    <button :disabled="isPending || !address" @click="deploy(feePayer)">
+      {{ isPending ? 'Deploying...' : 'Deploy Wallet' }}
+    </button>
+    <p v-if="error" style="color: red">{{ error }}</p>
   </div>
 </template>
 ```
@@ -103,6 +141,7 @@ const { address, isConnected, isDeploying, connect, deploy, error } = useInvisib
 Import the primitive from the `/solid` subpath. State arrives as accessors:
 
 ```tsx
+// @check-readme-ignore - example component without exports
 import { Show } from 'solid-js';
 import { useInvisibleWallet } from 'invisible-wallet-sdk/solid';
 
@@ -136,6 +175,7 @@ Import the service from the `/angular` subpath and configure it once at
 bootstrap with `provideVeil` — standalone-component compatible:
 
 ```ts
+// @check-readme-ignore - Angular bootstrap fragment
 // main.ts
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideVeil } from 'invisible-wallet-sdk/angular';
@@ -154,6 +194,7 @@ bootstrapApplication(AppComponent, {
 Components and services then inject the shared singleton:
 
 ```ts
+// @check-readme-ignore - Angular component with template syntax
 import { Component, inject } from '@angular/core';
 import { VeilService } from 'invisible-wallet-sdk/angular';
 
@@ -183,20 +224,35 @@ State arrives as signals — `wallet.address()`, `wallet.isDeployed()`,
 Use `createInvisibleWallet` for direct programmatic control without UI framework bindings:
 
 ```typescript
-import { createInvisibleWallet } from 'invisible-wallet-sdk/vanilla';
+// @check-readme-ignore - example showing vanilla API usage pattern
+import { createInvisibleWallet, type TransactionSigner } from 'invisible-wallet-sdk/vanilla';
 
 const wallet = createInvisibleWallet({
-  factoryContractId: 'CA...',
+  factoryAddress: 'CA...',
   networkPassphrase: 'Test SDF Network ; September 2015',
   rpcUrl: 'https://soroban-testnet.stellar.org',
 });
 
-// Register a new passkey and deploy a smart wallet
-const result = await wallet.deploy('alice');
-console.log('Contract Address:', result.address);
+// Register a new passkey
+const registerResult = await wallet.register('alice');
+console.log('Wallet address (counterfactual):', registerResult.walletAddress);
 
-// Sign a transaction
-const tx = await wallet.signTransaction(preparedTransaction);
+// Deploy the smart wallet with a fee-paying signer
+const feePayer: TransactionSigner = {
+  publicKey: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  signTransaction: async (xdr, { networkPassphrase }) => {
+    const res = await fetch('/api/sign', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ xdr, networkPassphrase }),
+    });
+    if (!res.ok) throw new Error('Signing failed');
+    return (await res.json()).signedXdr;
+  },
+};
+
+const deployResult = await wallet.deploy(feePayer);
+console.log('Deployed:', deployResult.address);
 ```
 
 ---
@@ -211,6 +267,7 @@ hands the callback its XDR, and your application signs wherever the key lives,
 typically a backend:
 
 ```ts
+// @check-readme-ignore - fragment showing TransactionSigner pattern
 import type { TransactionSigner } from 'invisible-wallet-sdk';
 
 const feePayer: TransactionSigner = {
